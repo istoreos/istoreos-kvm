@@ -2,13 +2,13 @@
 iStoreOS running on libvirt qemu-kvm, mainly for demo purpose
 
 # Prerequisite
-Run `grep -wEq 'vmx|svm|lm' /proc/cpuinfo && echo OK` on host to see if the host supports KVM.
+Run `grep -wEq 'vmx|svm|lm' /proc/cpuinfo && echo OK` on host to check if the host supports KVM.
 
 # Host
 Install *libvirt* and *qemu-kvm* (Debian or Ubuntu):
 ```
 sudo apt install qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils sshpass
-sudo systemctl is-active libvirtd | grep active
+sudo systemctl is-active libvirtd | grep active || echo "libvirtd not running, is it correctly installed?"
 sudo usermod -aG libvirt $USER
 sudo usermod -aG kvm $USER
 exit
@@ -53,7 +53,7 @@ virsh snapshot-create-as istoreos istoreos-running
 
 7. Forward host WAN ports to VM LAN ports
 ```
-sudo ./firewall.sh unblock
+sudo ./online.sh
 ```
 
 # Auto start and schedule reverting snapshot

@@ -1,9 +1,8 @@
 #!/bin/sh
 OFFLINE=0
-[ "$1" = init ] || {
-    [ -f /tmp/.istoreos_offline ] && OFFLINE=1
-    touch /tmp/.istoreos_offline
-}
+
+[ -f /tmp/.istoreos_offline ] && OFFLINE=1
+touch /tmp/.istoreos_offline
 
 ip link add name br-iso0 type bridge
 ip link add name br-iso1 type bridge
