@@ -1,5 +1,7 @@
 #!/bin/sh
+OFFLINE=0
 [ "$1" = init ] || {
+    [ -f /tmp/.istoreos_offline ] && OFFLINE=1
     touch /tmp/.istoreos_offline
 }
 
@@ -15,7 +17,7 @@ ip addr add 172.11.1.1/24 dev br-iso0
 ip addr add 192.168.100.2/24 dev br-iso1
 virsh start istoreos
 
-[ "$1" = init ] || {
+[ "$1" = init -o "$OFFLINE" = 1 ] || {
     virsh snapshot-revert istoreos --snapshotname istoreos-running --running # --force
     ./firewall.sh unblock
     rm -f /tmp/.istoreos_offline
