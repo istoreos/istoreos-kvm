@@ -19,6 +19,8 @@ patch_legacy(){
 unblock(){
     local port
     iptables -t nat -F ISKVM_FWD
+    iptables -t nat -A ISKVM_FWD -i $WAN_IF -j RETURN
+    iptables -t nat -A ISKVM_FWD -i $LAN_IF -j RETURN
     iptables -F ISKVM_WEB
     # port forward
     for port in $FORWARD_PORTS ; do
@@ -37,6 +39,8 @@ unblock(){
 block(){
     local port
     iptables -t nat -F ISKVM_FWD
+    iptables -t nat -A ISKVM_FWD -i $WAN_IF -j RETURN
+    iptables -t nat -A ISKVM_FWD -i $LAN_IF -j RETURN
     iptables -F ISKVM_WEB
     [ -z "$PROXY_PORTS" ] && return 0
     for port in $PROXY_PORTS ; do
@@ -56,22 +60,26 @@ start(){
         iptables -N $chain
         iptables -F $chain
     done
+    iptables -A ISKVM_INP -d 172.11.1.0/24 -p icmp -m icmp --icmp-type 8 -j ACCEPT
+    iptables -A ISKVM_INP -d 192.168.100.0/24 -p icmp -m icmp --icmp-type 8 -j ACCEPT
     iptables -A ISKVM_INP -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-    iptables -A ISKVM_INP -j REJECT --reject-with icmp-port-unreachable
+    iptables -A ISKVM_INP -j REJECT --reject-with icmp-host-prohibited
+    iptables -A ISKVM_FWI ! -s 172.11.1.0/24 -j DROP
     iptables -A ISKVM_FWI -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+
+    # deny accessing local network
+    for net in $BLOCK_NET ; do
+        iptables -A ISKVM_FWI -d $net -j REJECT --reject-with icmp-host-prohibited
+    done
     # avoid being zombie
     for port in $BLOCK_PORT ; do
         iptables -A ISKVM_FWI -p udp -m udp --dport $port -j REJECT --reject-with icmp-port-unreachable
         iptables -A ISKVM_FWI -p tcp -m tcp --dport $port -j REJECT --reject-with icmp-port-unreachable
     done
-
-    # deny accessing local network
-    for net in $BLOCK_NET ; do
-        iptables -A ISKVM_FWI -d $net -j REJECT --reject-with icmp-port-unreachable
-    done
-    iptables -A ISKVM_FWI -j ACCEPT
+    iptables -A ISKVM_FWI -m addrtype --dst-type UNICAST -j ACCEPT
+    iptables -A ISKVM_FWI -j DROP
     iptables -A ISKVM_FWO -j ACCEPT
-    iptables -A ISKVM_FWB -j REJECT --reject-with icmp-port-unreachable
+    iptables -A ISKVM_FWB -j DROP
     iptables -A ISKVM_OUT -j ACCEPT
 
     iptables -I INPUT -j ISKVM_WEB
@@ -87,12 +95,12 @@ start(){
     # nat table, out
     iptables -t nat -N ISKVM_INET
     iptables -t nat -F ISKVM_INET
-    iptables -t nat -A ISKVM_INET -i $WAN_IF ! -o $WAN_IF -j MASQUERADE
-    iptables -t nat -A ISKVM_INET ! -s 172.11.1.1/24 -j RETURN
+    # iptables -t nat -A ISKVM_INET -i $WAN_IF ! -o $WAN_IF -j MASQUERADE
+    iptables -t nat -A ISKVM_INET ! -s 172.11.1.0/24 -j RETURN
     for net in $BLOCK_NET ; do
         iptables -t nat -A ISKVM_INET -d $net -j ACCEPT
     done
-    iptables -t nat -A ISKVM_INET -d 172.11.1.1/24 -j ACCEPT
+    iptables -t nat -A ISKVM_INET -d 172.11.1.0/24 -j ACCEPT
     iptables -t nat -A ISKVM_INET -j MASQUERADE
     iptables -t nat -I POSTROUTING -j ISKVM_INET
 
